@@ -18,7 +18,7 @@ with Session(engine) as session:
     Session=sessionmaker(bind=engine)
     session=Session()
     
-
+# association table of member and books
 class MemberBook(Base):
     __tablename__ = 'member_book'
     id:Mapped[int] = mapped_column(primary_key=True,autoincrement=True)
@@ -44,9 +44,14 @@ class Members(Base):
     contact_no:Mapped[str] = mapped_column(String(20),nullable=False,unique=True)
     enroll_date:Mapped[DateTime] = mapped_column( DateTime(),default=datetime.utcnow().date())
     expiry_date:Mapped[DateTime] = mapped_column(DateTime(),default=datetime.utcnow().date() +timedelta(days=60))
+    
+    # testing librarian --- other working fine 
+    # librarian_id:Mapped[Integer]=mapped_column(ForeignKey('librarians.id'))
+    
     books = relationship('Books',secondary = 'member_book' , back_populates = 'members')
     magazines = relationship('Magazine',secondary = 'member_magazine',back_populates = 'members')
     records = relationship('Records',backref='members')
+    # librarian 
     
     def __init__(self,name,member_type,email,address,contact_no):
         self.name=name
@@ -54,6 +59,7 @@ class Members(Base):
         self.email=email
         self.address=address
         self.contact_no=contact_no
+        
     
     # need revision this concept
     @classmethod 
@@ -98,14 +104,95 @@ class Members(Base):
             
         else:
             print("Member not found !")
-        
             
-    def borrow_book():
-        pass   
         
-    
-  
-    
+    # borrow_book   
+    def borrow_book(member_id,book_id):
+        book=session.query(Books).filter_by(id=book_id).first()
+        member=session.query(Members).filter_by(id=member_id).first()
+        
+        if book and member:
+            book.members.append(member)
+            session.commit()
+            print(f"{member.name} has borrowed {book.title}")
+            
+            # create a record for borrow book 
+            record=Records(member_id=member_id,book_id=book_id,returned=False)
+            session.add(record)
+            session.commit()
+            print("Record add sucessfully !")
+        else:
+            print("Book not found !")        
+        
+    # return book 
+    # validation required 
+    # if three book is taken by one person then it is difficult to delete 
+    # exception handling is required 
+    def return_book(member_id,book_id):
+        book=session.query(Books).filter_by(id=book_id).first()
+        member=session.query(Members).filter_by(id=member_id).first()
+        
+        if book and member:
+            book.members.remove(member)
+            session.commit()
+            print(f"{member.name} has return  {book.title}")
+        #    find the already existing records
+            record=session.query(Records).filter_by(member_id=member_id,book_id=book_id,returned=False).first()
+            # update record
+            if record:
+                record.returned=True
+                record.return_date=datetime.utcnow().date()
+                session.commit()
+                print("Update returned book sucessfully !")
+            else:
+                print("Record not found !")
+        else:
+            print("Book and Member not found !")
+            
+        
+        
+        # borrow_magazine
+    def borrow_magazine(member_id,magazine_id):
+        magazine=session.query(Magazine).filter_by(id=magazine_id).first()
+        member=session.query(Members).filter_by(id=member_id).first()
+
+        if magazine and member:
+            magazine.members.append(member)
+            session.commit()
+            print(f"{member.name } has borrowed {magazine.title}")
+            # create database for magazine 
+            record=Records(member_id=member_id,magazine_id=magazine_id,returned=False)
+            session.add(record)
+            session.commit()
+            print("Record add Sucessfully ")
+        else:
+            print("Magazine and Member is not Found !")   
+            
+            
+            #return magazine  
+            # exception handling 
+            # validation 
+            
+    def return_magazine(member_id,magazine_id):
+        magazine=session.query(Magazine).filter_by(id=magazine_id).first()
+        member=session.query(Members).filter_by(id=member_id).first()
+        
+        if magazine and member:
+            magazine.members.remove(member)
+            session.commit()
+            print(f"{member.name} has returned {magazine.title}")
+            # find existing magazine here 
+            record=session.query(Records).filter_by(member_id=member_id,magazine_id=magazine_id,returned=False).first()
+            if record: #record bheteu bhane chai tala ko kura change garnu hai ta
+                record.returned=True
+                record.return_date=datetime.utcnow().date() #aajha ko date ma book return garyo date change vayo haina ta 
+                session.commit()
+                print("updated returned magazine sucessfully ! ")
+                
+            
+        else:
+            print("Magazine and Member is not found !")
+            
     
 class Books(Base):
     __tablename__ = 'books'
@@ -115,13 +202,15 @@ class Books(Base):
     title:Mapped[str] = mapped_column(nullable=False)
     author:Mapped[str] = mapped_column(nullable=False)
     price:Mapped[int] = mapped_column(nullable=False)
-    is_available:Mapped[bool]=mapped_column(nullable=False)
+    # is_available:Mapped[bool]=mapped_column(nullable=False)
     
     members = relationship('Members',secondary = 'member_book',back_populates = 'books')
     publisher_id:Mapped[int] = mapped_column(ForeignKey('publishers.id'))
     publishers = relationship('Publisher',back_populates = 'books')
     category_id:Mapped[int] = mapped_column(ForeignKey('category.id'))
     categories = relationship('Category',back_populates = 'books')
+    # testing librarians
+    # librarian_id:Mapped[Integer]=mapped_column(ForeignKey('librarians.id'))
     records = relationship('Records',backref='books')
     
     def __init__(self,isbn,title,author,price):
@@ -129,6 +218,7 @@ class Books(Base):
         self.title=title
         self.author=author
         self.price=price
+        # self.is_available=True
     
     
     @classmethod
@@ -170,13 +260,17 @@ class Magazine(Base):
     title:Mapped[str] = mapped_column(nullable=False)
     price:Mapped[int] = mapped_column(nullable=False)
     editor:Mapped[str] = mapped_column(nullable=False)
-    is_available:Mapped[bool]=mapped_column(nullable=False)
+    # is_available:Mapped[bool]=mapped_column(nullable=False)
     members=relationship('Members',secondary = 'member_magazine',back_populates = 'magazines')    
     publisher_id:Mapped[int] = mapped_column(ForeignKey('publishers.id'))
     publishers = relationship('Publisher',back_populates = 'magazines')
     category_id:Mapped[int] = mapped_column(ForeignKey('category.id'))
     categories = relationship('Category',back_populates = 'magazines')
+    # testing the phase
+    # librarian_id:Mapped[Integer]=mapped_column(ForeignKey('librarians.id'))
+    
     records = relationship('Records',backref='magazines')
+    
     
     
     def __init__(self,issn,title,price,editor):
@@ -304,7 +398,28 @@ class Category(Base):
         
         else:
             print("Category   not Found !!")
+
+
     
+class Librarian(Base):
+    __tablename__='librarians'
+    
+    id:Mapped[int]=mapped_column(primary_key=True, autoincrement=True)
+    name:Mapped[str]=mapped_column(nullable=False,unique=True)
+    contact_no:Mapped[int]=mapped_column(nullable=False)
+    # member=relationship('Members',backref='librarian')
+    # book=relationship('Books',backref='librarian')  #librarian =>Librarian (class just a case sensative)
+    # magazine=relationship('Magazine',backref='librarian')
+    # record=relationship('Records',backref='librarian')
+    
+    # TODO -manage books -manage magazine - manage records
+       
+    def __init__(self,name,contact_no):
+        self.name=name
+        self.contact_no=contact_no
+        
+    
+        
     
 class Records(Base):
     __tablename__ = 'records'
@@ -313,25 +428,25 @@ class Records(Base):
     member_id:Mapped[int] = mapped_column(ForeignKey('members.id'))
     book_id:Mapped[int] = mapped_column(ForeignKey('books.id'),nullable=True)
     magazine_id:Mapped[int] = mapped_column(ForeignKey('magazines.id'),nullable=True)
+    returned:Mapped[bool]=mapped_column(nullable=False,default=False)
     return_date:Mapped[DateTime] = mapped_column(DateTime(),default=datetime.utcnow().date() +timedelta(days=15))
     borrow_date:Mapped[DateTime] = mapped_column(DateTime(),default = datetime.utcnow().date())
     
-    def __init__(self,member_id,book_id=None,magazine_id=None):
+    # testing librarian data 
+    # librarian_id:Mapped[Integer]=mapped_column(ForeignKey('librarians.id'))
+    
+    
+    def __init__(self,member_id,book_id=None,magazine_id=None,returned=False):
         
         if not book_id and not magazine_id:
-            raise Exception("")
+            raise Exception("No book and Magazine Found  !")
         self.member_id=member_id
         self.book_id=book_id
         self.magazine_id=magazine_id
-     
+        self.returned=returned
+        
     @staticmethod
     def show_all_record():
         return session.query(Records).all()
     
-    
-    def add_new_record(self):
-            record=Records(self.member_id,self.book_id,self.magazine_id)
-            session.add(record)
-            session.commit()
-            
-    
+  

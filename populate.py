@@ -1,4 +1,23 @@
 from database import session,Members,Books,Base,MemberBook,MemberMagazine,Magazine,Publisher,Records,Category
+from database import Members
+# test borrow book
+# book_one=Books(isbn=122,title='Rohan Biography',author="rohan sir",price=400)
+
+# book_two=Books(isbn=411,title='Kausal Biography',author="Kausal sir",price=450)
+
+# book_three=Books(isbn=152,title='Sabin Biography',author="sabin sir",price=500)
+
+# member_one=Members(name="Rk pudasaini",member_type="staff",address="Dhapasi",contact_no=9810228669,email="gjk@gmail.com",)
+# member_two=Members(name="Gk pudasaini",member_type="customer",address="Achham",contact_no=98102269,email="gj@gmail.com",)
+# member_three=Members(name="Sk pudasaini",member_type="scustomer",address="Bajura",contact_no=98102669,email="jk@gmail.com",)
+
+# session.add_all(book_one,book_two,book_three,member_one,member_two,member_three)
+# session.commit()
+
+# borrow a book
+# Members.borrow_book(book_one.id,member_one.id)
+
+
 
 pub=Publisher(name="Minesh",contact_no=9804844,address="Daraba Marg")
 
