@@ -6,8 +6,9 @@ class Base(DeclarativeBase):
     pass
 
 try:
-    engine=create_engine('postgresql://postgres:123456789@127.0.0.1:5432/postgres',echo=False)
-    print("Connection Okey") 
+    # engine=create_engine('postgresql://postgres:123456789@127.0.0.1:5432/postgres',echo=False)
+    engine=create_engine('postgresql://postgres:postgres@127.0.0.1:5432/postgres',echo=False)
+    print("Connection Okay") 
     
 except Exception as er:
     print(er)
@@ -55,15 +56,33 @@ class Member(Base):
         self.contact_no = contact_no
     
      
-    @staticmethod
-    def get_member(email):
-        return session.query(Member).filter_by(email = email).first()
+    @classmethod
+    def get_member(cls, email):
+        return session.query(cls).filter_by(email = email).first()
         
-    def get_all_members(self):
-        return session.query(Member).all()
+    @classmethod
+    def get_all_members(cls):
+        return session.query(cls).all()
         
     @staticmethod
     def add_member(name,member_type,email,address,contact_no):
+    
+        if not name:
+            print("name cannot be empty ")
+            return
+        elif not member_type :
+            print('member_type cannot be empty !')
+            return
+        elif not email:
+            print("email connot be empty !")
+            return
+        elif not address:
+            print("address cannot be empty !")
+            return
+        elif not contact_no:
+            print("contact_no cannot be none !")
+            return
+        
         member = Member(name,member_type,email,address,contact_no)
         session.add(member)
         session.commit()
@@ -95,22 +114,22 @@ class Book(Base):
         self.category_id = category_id
       
   
-    @staticmethod
-    def get_all_book():
-        return session.query(Book).all()
-    
     @classmethod
-    def add_book(cls,isbn,title,author,price,publisher_id=None,category_id=None):
-        book = cls(isbn=isbn,title=title,author=author,price=price,publisher_id=publisher_id,category_id=category_id)
+    def get_all_books(cls):
+        return session.query(cls).all()
+    
+    @staticmethod
+    def add_book(isbn,title,author,price,publisher_id=None,category_id=None):
+        book = Book(isbn=isbn,title=title,author=author,price=price,publisher_id=publisher_id,category_id=category_id)
         session.add(book)
         session.commit()
         print("Book added SucessFull !")
        
        
-    def borrow_book(self,member_id,book_id):
+    def borrow_book(self,member_id):
         try:
             
-            book = session.query(Book).filter_by(id=book_id).first()
+            book = session.query(Book).filter_by(id=self.id).first()
             member = session.query(Member).filter_by(id=member_id).first()
             
             if book is None and member is None:
@@ -128,7 +147,7 @@ class Book(Base):
             book.members.append(member)
             session.commit()
             print(f"{member.name} has borrowed {book.title}")
-            record = Record(member_id=member_id,book_id=book_id,returned=False)
+            record = Record(member_id=member_id,book_id=self.id,returned=False)
             session.add(record)
             session.commit()
             print("Record add sucessfully !")
@@ -138,33 +157,33 @@ class Book(Base):
             
         except Exception as e:
             print(f"An Error occured :{e}")
-            
-            
-    def return_book(self,member_id,book_id):
+
+
+    def return_book(self,member_id):
         try:
-            book = session.query(Book).filter_by(id=book_id).first()
+            book = session.query(Book).filter_by(id=self.id).first()
             member = session.query(Member).filter_by(id=member_id).first()
-            
+
             if book is None and member is None:
                 raise NoResultFound("provide both book and magazine")
             book.members.remove(member)
             session.commit()
             print(f"{member.name} has return  {book.title}")
-            
-            record = session.query(Record).filter_by(member_id=member_id,book_id=book_id,returned=False).first()
+
+            record = session.query(Record).filter_by(member_id=member_id,book_id=self.id,returned=False).first()
             if record:
                 record.returned = True
                 record.return_date = datetime.utcnow().date()
                 session.commit()
                 print("Update returned book sucessfully !")
-            
+
         except NoResultFound as e:
             print(e)
-        
+
         except Exception as e:
             print("Book and Member not found !")
-                 
-        
+            print(e)
+
 class Magazine(Base):
     __tablename__ = 'magazines'
     
@@ -196,23 +215,22 @@ class Magazine(Base):
         return cls(magazine.issn,magazine.title,magazine.price,magazine.editor)
        
     
-    @classmethod
-    def add_magazine(cls,issn,title,price,editor,publisher_id=None,category_id=None):
-        magazine = cls(issn=issn,title=title,price=price,editor=editor,publisher_id=publisher_id,category_id=category_id)
+    @staticmethod
+    def add_magazine(issn,title,price,editor,publisher_id=None,category_id=None):
+        magazine = Magazine(issn=issn,title=title,price=price,editor=editor,publisher_id=publisher_id,category_id=category_id)
         session.add(magazine)
         session.commit()
         print("Magazine added SucessFully !")
         
-    
-    
-    def show_all_magazine():
-        return session.query(Magazine).all()
+    @classmethod
+    def show_all_magazines(cls):
+        return session.query(cls).all()
     
             
             
-    def borrow_magazine(self,member_id,magazine_id):
+    def borrow_magazine(self,member_id):
         try:
-            magazine = session.query(Magazine).filter_by(id=magazine_id).first()
+            magazine = session.query(Magazine).filter_by(id=self.id).first()
             member = session.query(Member).filter_by(id=member_id).first()
 
             if magazine is None and member is None:
@@ -232,7 +250,7 @@ class Magazine(Base):
             session.commit()
             print(f"{member.name } has borrowed {magazine.title}")
             # create database for magazine 
-            record=Record(member_id=member_id,magazine_id=magazine_id,returned=False)
+            record=Record(member_id=member_id,magazine_id=self.id,returned=False)
             session.add(record)
             session.commit()
             print("Record add Sucessfully ")
@@ -244,9 +262,10 @@ class Magazine(Base):
         except Exception as e:
             print(f"No Magazine is found ")
             
-    def return_magazine(self,member_id,magazine_id):
+
+    def return_magazine(self,member_id):
         try:
-            magazine = session.query(Magazine).filter_by(id=magazine_id).first()
+            magazine = session.query(Magazine).filter_by(id=self.id).first()
             member = session.query(Member).filter_by(id=member_id).first()
             
             if magazine is None and member is None:
@@ -254,11 +273,10 @@ class Magazine(Base):
             magazine.members.remove(member)
             session.commit()
             print(f"{member.name} has returned {magazine.title}")
-            # find existing magazine here 
-            record = session.query(Record).filter_by(member_id=member_id,magazine_id=magazine_id,returned=False).first()
-            if record: #record bheteu bhane chai tala ko kura change garnu hai ta
+            record = session.query(Record).filter_by(member_id=member_id,magazine_id=self.id,returned=False).first()
+            if record: 
                 record.returned = True
-                record.return_date = datetime.utcnow().date() #aajha ko date ma book return garyo date change vayo haina ta 
+                record.return_date = datetime.utcnow().date() 
                 session.commit()
                 print("updated returned magazine sucessfully ! ")
                     
@@ -285,14 +303,14 @@ class Publisher(Base):
         self.contact_no = contact_no
         self.address = address
         
-    
-    def show_all_publisher():
-        return session.query(Publisher).all()
-    
-    
     @classmethod
-    def add_publisher(cls,name,contact_no,address):
-        publisher=cls(name=name,contact_no=contact_no,address=address)
+    def show_all_publishers(cls):
+        return session.query(cls).all()
+    
+    
+    @staticmethod
+    def add_publisher(name,contact_no,address):
+        publisher=Publisher(name=name,contact_no=contact_no,address=address)
         session.add(publisher)
         session.commit()
         print("Publisher added Sucessfully !")
@@ -321,12 +339,13 @@ class Category(Base):
         category=session.query(Category).filter_by(name=name).first()
         return cls(category.name)
     
-    def show_all_category():
-        return session.query(Category).all()
-    
     @classmethod
-    def add_category(cls,name):
-        category=cls(name=name)
+    def show_all_categories(cls):
+        return session.query(cls).all()
+    
+    @staticmethod
+    def add_category(name):
+        category=Category(name=name)
         session.add(category)
         session.commit()
         print("Category Added SucessFully !")
@@ -348,10 +367,9 @@ class Librarian(Base):
         self.email=email
       
         
-    @staticmethod
-    def get_email(email):
-        return session.query(Librarian).filter_by(email=email).one_or_none()
-        
+    @classmethod
+    def get_librarian_by_email(cls, email):
+        return session.query(cls).filter_by(email=email).one_or_none()
        
     
 class Record(Base):
@@ -375,12 +393,12 @@ class Record(Base):
         self.magazine_id=magazine_id
         self.returned=returned
         
-    @staticmethod   
-    def show_all_record(member_id):
-        return session.query(Record).filter_by(member_id=member_id).all()
+    @classmethod   
+    def show_all_records(cls, member_id):
+        return session.query(cls).filter_by(member_id=member_id).all()
     
-    @staticmethod
-    def show_user_record(member_id):
-        return session.query(Record).filter_by(member_id=member_id,returned=False).all()
+    @classmethod
+    def show_user_record(cls, member_id):
+        return session.query(cls).filter_by(member_id=member_id,returned=False).all()
     
   

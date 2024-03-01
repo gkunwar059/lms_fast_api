@@ -600,13 +600,13 @@
 #                     [8] Exit
                     
 #                     ''')
-                
+           --------------------------------------------------------------------------------------------------------     
 #                 choice = int(input("Enter your Choice :  "))
 #                 if choice == 1:
 #                     books = Book.get_all_book()
 #                     for book in books:
 #                         print(f"{book.title}")
-                        
+         -----------------------------------------------------------------------------------------------------------               
 #                 elif choice == 2:
 #                     books = Book.get_all_book()
 #                     for book in books:
@@ -617,7 +617,7 @@
 #                     else:
 #                         print("Member not found .Please enter valid email")
                 
-                        
+              ----------------------------------------------------------------------------------------------------          
 #                 elif choice == 3:
 #                     books = Record.show_user_record(member.id)
 #                     for book in books:
@@ -627,12 +627,13 @@
 #                     if member:
 #                         book_return = Book.return_book(Book,member.id,remove_book_id)
                         
-            
+            -----------------------------------------------------------------------------------------------------
 #                 elif choice==4:
 #                     magazines=Magazine.show_all_magazine()
 #                     for magazine in magazines:
 #                         print(f"{magazine.id} {magazine.title}")
-                        
+
+          ---------------------------------------------------------------------------------------------------------              
 #                 elif choice == 5:
 #                     magazines = Magazine.show_all_magazine()
 #                     for magazine in magazines:
@@ -643,7 +644,7 @@
 #                     else:
 #                         print("Magazine not found !")
                     
-                        
+             -------------------------------------------------------------------------------------------------------           
 #                 elif choice == 6:
 #                     magazines = Record.show_user_record(member.id)
 #                     for magazine in magazines:
@@ -652,7 +653,10 @@
 #                     remove_magazine_id = int(input("remove magazine with magazine_id :"))
 #                     if member:
 #                         magazine_return = Magazine.return_magazine(Magazine,member.id,remove_magazine_id)
-                                
+
+
+
+                   --------------------------------------------------------------------------             
 #                 elif choice == 7:
 #                     records=Record.show_all_record(member.id)
 #                     for record in records:
@@ -662,7 +666,7 @@
 #                     print("Redirecting back to main menu !")
         
 #                     break
-                
+          --------------------------------------------------------------------------------------------------------------      
 #         elif choice == 3:
 #             email=input("Enter your email ")
             
@@ -740,6 +744,7 @@
 #             print("Enter your valid choice !")
 #             continue
         
+
             
     
         
