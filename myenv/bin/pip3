@@ -1,4 +1,6 @@
-#!/home/ganesh/Interntask/library_management_system_cli_application/myenv/bin/python3
+#!/bin/sh
+'''exec' "/home/ganesh/library_management_system (fast_api)/myenv/bin/python3" "$0" "$@"
+' '''
 # -*- coding: utf-8 -*-
 import re
 import sys

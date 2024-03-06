@@ -6,8 +6,8 @@ class Base(DeclarativeBase):
     pass
 
 try:
-    # engine=create_engine('postgresql://postgres:123456789@127.0.0.1:5432/postgres',echo=False)
-    engine=create_engine('postgresql://postgres:postgres@127.0.0.1:5432/postgres',echo=False)
+    engine=create_engine('postgresql://postgres:123456789@127.0.0.1:5432/postgres',echo=False)
+    # engine=create_engine('postgresql://postgres:postgres@127.0.0.1:5432/postgres',echo=False)
     print("Connection Okay") 
     
 except Exception as er:

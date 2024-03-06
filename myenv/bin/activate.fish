@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/home/ganesh/Interntask/library_management_system_cli_application/myenv"
+set -gx VIRTUAL_ENV "/home/ganesh/library_management_system (fast_api)/myenv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH
