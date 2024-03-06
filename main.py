@@ -37,7 +37,7 @@ if __name__=='__main__':
 
 
             except Exception as e:
-                print(f"Error : {str(e)}")
+                print(e)
         
         elif choice == 2:
             email = input("Enter your email:  ")
@@ -93,6 +93,7 @@ if __name__=='__main__':
                         else:
                             print("Member not found .Please enter valid email")
                     
+
 
                     elif choice == 3:
                         os.system("clear")
@@ -201,9 +202,11 @@ if __name__=='__main__':
                         [3] Add Member
                         [4] Add Category
                         [5] Add Publisher
-                        [6] Exit 
+                        [6] Exit
+                       
                         
                         ''')
+                    #  [6] Exit 
                     try:
                         choice=int(input("Enter your choice : "))
                     except ValueError:
@@ -275,7 +278,12 @@ if __name__=='__main__':
                             new_publisher = Publisher.add_publisher(name,contact_no,address)
                         except Exception as err:
                             print(e)
-                
+
+                    elif choice==6:
+                        print("Redirecting to main Menu ")
+                        break
+
+
             else:
                 print("Provide a Valid librarian email ")       
                 
