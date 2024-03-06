@@ -7,7 +7,6 @@ class Base(DeclarativeBase):
 
 try:
     engine=create_engine('postgresql://postgres:123456789@127.0.0.1:5432/postgres',echo=False)
-    # engine=create_engine('postgresql://postgres:postgres@127.0.0.1:5432/postgres',echo=False)
     print("Connection Okay") 
     
 except Exception as er:
@@ -41,7 +40,7 @@ class Member(Base):
     member_type:Mapped[str] = mapped_column(nullable=False)
     email:Mapped[str]=mapped_column(nullable=False,unique=True)
     address:Mapped[str] = mapped_column(nullable=False)
-    contact_no:Mapped[str] = mapped_column(String(20),nullable=False,unique=True)
+    contact_no:Mapped[int] = mapped_column(nullable=False,unique=True)
     enroll_date:Mapped[DateTime] = mapped_column( DateTime(),default=datetime.utcnow().date())
     expiry_date:Mapped[DateTime] = mapped_column(DateTime(),default=datetime.utcnow().date() +timedelta(days=60))
     books = relationship('Book',secondary = 'member_book' , back_populates = 'members')
@@ -55,7 +54,7 @@ class Member(Base):
         self.address = address
         self.contact_no = contact_no
     
-     
+    
     @classmethod
     def get_member(cls, email):
         return session.query(cls).filter_by(email = email).first()
@@ -86,8 +85,9 @@ class Member(Base):
         member = Member(name,member_type,email,address,contact_no)
         session.add(member)
         session.commit()
-        print("Member added Successfully !")
-        
+        return ("Member added Successfully !")
+    
+   
      
         
 class Book(Base):
@@ -112,7 +112,13 @@ class Book(Base):
         self.price = price
         self.publisher_id = publisher_id
         self.category_id = category_id
-      
+        
+        
+    @classmethod
+    def get_book(cls,isbn):
+        book = session.query(Book).filter_by(isbn=isbn).first()
+        return cls(book.isbn,book.title,book.price,book.author)
+        
   
     @classmethod
     def get_all_books(cls):
@@ -123,7 +129,7 @@ class Book(Base):
         book = Book(isbn=isbn,title=title,author=author,price=price,publisher_id=publisher_id,category_id=category_id)
         session.add(book)
         session.commit()
-        print("Book added SucessFull !")
+        return("Book added Sucessfully  !")
        
        
     def borrow_book(self,member_id):
@@ -220,7 +226,7 @@ class Magazine(Base):
         magazine = Magazine(issn=issn,title=title,price=price,editor=editor,publisher_id=publisher_id,category_id=category_id)
         session.add(magazine)
         session.commit()
-        print("Magazine added SucessFully !")
+        return("Magazine added SucessFully !")
         
     @classmethod
     def show_all_magazines(cls):
@@ -313,7 +319,7 @@ class Publisher(Base):
         publisher=Publisher(name=name,contact_no=contact_no,address=address)
         session.add(publisher)
         session.commit()
-        print("Publisher added Sucessfully !")
+        return("Publisher added Sucessfully !")
     
     @classmethod
     def get_publisher(cls,name):
@@ -348,7 +354,7 @@ class Category(Base):
         category=Category(name=name)
         session.add(category)
         session.commit()
-        print("Category Added SucessFully !")
+        return("Category Added SucessFully !")
         
    
 

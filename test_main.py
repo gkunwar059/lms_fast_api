@@ -24,7 +24,7 @@ if __name__=='__main__':
             print("Invalid input . Please enter a number ")
             continue
 
-        
+    
         if choice == 1:
             try:
                 name = input("Enter your name :")
