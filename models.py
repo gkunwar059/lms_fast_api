@@ -2,6 +2,8 @@ from sqlalchemy import String,Integer,ForeignKey,MetaData,create_engine,DateTime
 from datetime import datetime,timedelta
 from sqlalchemy.orm import Session,relationship,sessionmaker,session,Mapped,mapped_column,DeclarativeBase
 from sqlalchemy.orm.exc import NoResultFound
+from email_validator import validate_email,EmailNotValidError
+import hashlib
 class Base(DeclarativeBase):
     pass
 
@@ -39,6 +41,7 @@ class Member(Base):
     name:Mapped[str] = mapped_column(nullable=False)
     member_type:Mapped[str] = mapped_column(nullable=False)
     email:Mapped[str]=mapped_column(nullable=False,unique=True)
+    password:Mapped[str]=mapped_column(nullable=False)
     address:Mapped[str] = mapped_column(nullable=False)
     contact_no:Mapped[int] = mapped_column(nullable=False,unique=True)
     enroll_date:Mapped[DateTime] = mapped_column( DateTime(),default=datetime.utcnow().date())
@@ -47,10 +50,11 @@ class Member(Base):
     magazines = relationship('Magazine',secondary = 'member_magazine',back_populates = 'members')
     records = relationship('Record',backref='members')
     
-    def __init__(self,name,member_type,email,address,contact_no):
+    def __init__(self,name,member_type,email,password,address,contact_no):
         self.name = name
         self.member_type = member_type
         self.email = email
+        self.password=password
         self.address = address
         self.contact_no = contact_no
     
@@ -64,32 +68,31 @@ class Member(Base):
         return session.query(cls).all()
         
     @staticmethod
-    def add_member(name,member_type,email,address,contact_no):
-    
-        if not name:
-            print("name cannot be empty ")
-            return
-        elif not member_type :
-            print('member_type cannot be empty !')
-            return
-        elif not email:
-            print("email connot be empty !")
-            return
-        elif not address:
-            print("address cannot be empty !")
-            return
-        elif not contact_no:
-            print("contact_no cannot be none !")
-            return
+    def add_member(name,member_type,email,password,address,contact_no):
         
-        member = Member(name,member_type,email,address,contact_no)
-        session.add(member)
-        session.commit()
-        return ("Member added Successfully !")
+        try:
+            validate_email(email)
+        except EmailNotValidError:
+            raise ValueError("Invalid email ,Please provide a valid email !")
     
-   
-     
+        if not (name and member_type and email and password  and address and contact_no):
+            raise  ValueError("All field required !")
         
+        existing_member = session.query(Member).filter_by(email=email).first()
+        if existing_member:
+            raise ValueError("Member with this email already exists !")
+        
+        new_member = Member(name,member_type,email,password,address,contact_no)
+        session.add(new_member)
+        try:
+            session.commit()
+            return ("Member added Successfully !")
+        
+        except Exception as e:    
+            session.rollback()
+            raise e
+        
+    
 class Book(Base):
     __tablename__ = 'books'
     
@@ -124,50 +127,67 @@ class Book(Base):
     def get_all_books(cls):
         return session.query(cls).all()
     
+    
     @staticmethod
     def add_book(isbn,title,author,price,publisher_id=None,category_id=None):
+        
+        if not(isbn and title and author and price and publisher_id and category_id):
+            raise ValueError("All field required !")
+        
+        existing_book=session.query(Book).filter_by(isbn=isbn).first()
+        
+        if existing_book:
+            raise ValueError("Book is already exist with isbn numnber !")
+        
         book = Book(isbn=isbn,title=title,author=author,price=price,publisher_id=publisher_id,category_id=category_id)
         session.add(book)
-        session.commit()
-        return("Book added Sucessfully  !")
-       
+        try:
+            session.commit()
+            return("Book added Sucessfully  !")
+        
+        except Exception as e:
+            session.rollback()
+            print(str(e))
+            
        
     def borrow_book(self,member_id):
         try:
             
-            book = session.query(Book).filter_by(id=self.id).first()
+            book = session.query(Book).filter_by(isbn=self.isbn).first()
             member = session.query(Member).filter_by(id=member_id).first()
             
-            if book is None and member is None:
+            # if book is None and member is None:
+            if not (book and member):
                 raise NoResultFound("Both member and book not found  !")
             
             existing_record=session.query(Record).\
-                filter(Record.member_id == member_id,Record.returned == False) .\
+                filter(Record.member_id == member_id,Record.returned == False, Record.book_id == book.isbn) .\
                 join(Book,Record.book_id == Book.id) .\
                 filter(Book.isbn == book.isbn).first()  
                 
-                
+
             if existing_record:
                 raise Exception (f"{member.name} has already borrowed a copy of {book.title} with the same ISBN number  ")
             
             book.members.append(member)
             session.commit()
             print(f"{member.name} has borrowed {book.title}")
-            record = Record(member_id=member_id,book_id=self.id,returned=False)
+            record = Record(member_id=member_id,book_id=self.isbn,returned=False)
             session.add(record)
             session.commit()
-            print("Record add sucessfully !")
+            return("Record add sucessfully !")
             
         except NoResultFound as e:
             print(e)
+            session.rollback()
             
         except Exception as e:
             print(f"An Error occured :{e}")
-
+            session.rollback()
 
     def return_book(self,member_id):
         try:
-            book = session.query(Book).filter_by(id=self.id).first()
+            book = session.query(Book).filter_by(isbn=self.isbn).first()
             member = session.query(Member).filter_by(id=member_id).first()
 
             if book is None and member is None:
@@ -176,19 +196,21 @@ class Book(Base):
             session.commit()
             print(f"{member.name} has return  {book.title}")
 
-            record = session.query(Record).filter_by(member_id=member_id,book_id=self.id,returned=False).first()
+            record = session.query(Record).filter_by(member_id=member_id,book_id=self.isbn,returned=False).first()
             if record:
                 record.returned = True
                 record.return_date = datetime.utcnow().date()
                 session.commit()
-                print("Update returned book sucessfully !")
+                return("Update returned book sucessfully !")
 
         except NoResultFound as e:
             print(e)
+            session.rollback()
 
         except Exception as e:
             print("Book and Member not found !")
             print(e)
+            session.rollback()
 
 class Magazine(Base):
     __tablename__ = 'magazines'
@@ -223,23 +245,36 @@ class Magazine(Base):
     
     @staticmethod
     def add_magazine(issn,title,price,editor,publisher_id=None,category_id=None):
+        
+        if not (issn and title and price and editor and publisher_id and category_id):
+            raise ValueError("All field required !")
+        
+        existing_magazine=session.query(Magazine).filter_by(issn=issn).first()
+        if existing_magazine:
+            raise ValueError("Magazine already exists")
+        
         magazine = Magazine(issn=issn,title=title,price=price,editor=editor,publisher_id=publisher_id,category_id=category_id)
         session.add(magazine)
-        session.commit()
-        return("Magazine added SucessFully !")
-        
+        try:
+            session.commit()
+            return("Magazine added SucessFully !")
+        except Exception as e:
+            session.rollback()
+            print(str(e))
+            
+            
+            
     @classmethod
     def show_all_magazines(cls):
         return session.query(cls).all()
     
-            
-            
+                  
     def borrow_magazine(self,member_id):
         try:
-            magazine = session.query(Magazine).filter_by(id=self.id).first()
+            magazine = session.query(Magazine).filter_by(issn=self.issn).first()
             member = session.query(Member).filter_by(id=member_id).first()
 
-            if magazine is None and member is None:
+            if not(magazine and member):
                 raise NoResultFound("Both member and book not found  !")
                 
                 
@@ -256,22 +291,30 @@ class Magazine(Base):
             session.commit()
             print(f"{member.name } has borrowed {magazine.title}")
             # create database for magazine 
-            record=Record(member_id=member_id,magazine_id=self.id,returned=False)
-            session.add(record)
-            session.commit()
-            print("Record add Sucessfully ")
             
+            record=Record(member_id=member_id,magazine_id=self.issn,returned=False)
+            session.add(record)
+            try:
+                session.commit()
+                # print("Record add Sucessfully ")
+                return("Record add Sucessfully ")
+                
+            except Exception as e:
+                session.rollback()
+                print(str(e))
         
         except NoResultFound as e:
             print(e)
             
         except Exception as e:
             print(f"No Magazine is found ")
+            session.rollback()
             
+
 
     def return_magazine(self,member_id):
         try:
-            magazine = session.query(Magazine).filter_by(id=self.id).first()
+            magazine = session.query(Magazine).filter_by(issn=self.issn).first()
             member = session.query(Member).filter_by(id=member_id).first()
             
             if magazine is None and member is None:
@@ -279,20 +322,28 @@ class Magazine(Base):
             magazine.members.remove(member)
             session.commit()
             print(f"{member.name} has returned {magazine.title}")
-            record = session.query(Record).filter_by(member_id=member_id,magazine_id=self.id,returned=False).first()
+            record = session.query(Record).filter_by(member_id=member_id,magazine_id=self.issn,returned=False).first()
             if record: 
                 record.returned = True
                 record.return_date = datetime.utcnow().date() 
-                session.commit()
-                print("updated returned magazine sucessfully ! ")
+                try:
+                    session.commit()
+                    # print("updated returned magazine sucessfully ! ")
+                    return("updated returned magazine sucessfully ! ")
+                    
+                except Exception as e:
+                    session.rollback()
+                    print(str(e))    
                     
         except NoResultFound as e:
-            print(e)       
+            print(str(e))  
+            session.rollback()
+                 
         except Exception as e:
-            print("Magazine and Member is not found !")
+            session.rollback()
+            print(str(e))            
     
     
-            
     
 class Publisher(Base):
     __tablename__ = 'publishers'
@@ -316,18 +367,31 @@ class Publisher(Base):
     
     @staticmethod
     def add_publisher(name,contact_no,address):
+        if not(name and contact_no and address):
+            raise ValueError("All field required !")
+        
+        existing_publisher=session.query(Publisher).filter_by(name=name).first()
+        if existing_publisher:
+            raise ValueError("Already publisher exists")
+        
         publisher=Publisher(name=name,contact_no=contact_no,address=address)
         session.add(publisher)
-        session.commit()
-        return("Publisher added Sucessfully !")
-    
+        try:
+            session.commit()
+            return("Publisher added Sucessfully !")
+        
+        except Exception as e:
+            session.rollback()
+            print(str(e))
+            
+            
+                  
     @classmethod
     def get_publisher(cls,name):
         publisher=session.query(Publisher).filter_by(name=name).first()
         return cls(publisher.name,publisher.contact_no,publisher.address)
     
     
-
 class Category(Base):
     __tablename__ = 'category'
     
@@ -349,13 +413,26 @@ class Category(Base):
     def show_all_categories(cls):
         return session.query(cls).all()
     
+    
     @staticmethod
     def add_category(name):
-        category=Category(name=name)
-        session.add(category)
-        session.commit()
-        return("Category Added SucessFully !")
+        if not name:
+            raise ValueError("Name required !")
         
+        existing_category=session.query(Category).filter_by(name=name).first()
+        if existing_category:
+            raise ValueError("Category already exists")
+        category=Category(name=name)
+        
+        
+        session.add(category)
+        try:
+            session.commit()
+            return("Category Added SucessFully !")
+        
+        except Exception as e:
+            session.rollback()
+            print(str(e))    
    
 
     
@@ -365,17 +442,19 @@ class Librarian(Base):
     id:Mapped[int]=mapped_column(primary_key=True, autoincrement=True)
     name:Mapped[str]=mapped_column(nullable=False,unique=True)
     email:Mapped[str]=mapped_column(nullable=False,unique=True)
+    password:Mapped[str]=mapped_column(nullable=False)
     contact_no:Mapped[int]=mapped_column(nullable=False)
        
-    def __init__(self,name,contact_no,email):
+    def __init__(self,name,contact_no,email,password):
         self.name=name
         self.contact_no=contact_no
         self.email=email
-      
-        
+        self.password=password
+    
+   
     @classmethod
     def get_librarian_by_email(cls, email):
-        return session.query(cls).filter_by(email=email).one_or_none()
+        return session.query(cls).where(Librarian.email==email).first()
        
     
 class Record(Base):
@@ -383,8 +462,8 @@ class Record(Base):
     
     id:Mapped[int] = mapped_column(primary_key=True,autoincrement=True)
     member_id:Mapped[int] = mapped_column(ForeignKey('members.id'))
-    book_id:Mapped[int] = mapped_column(ForeignKey('books.id'),nullable=True)
-    magazine_id:Mapped[int] = mapped_column(ForeignKey('magazines.id'),nullable=True)
+    book_id:Mapped[int] = mapped_column(ForeignKey('books.isbn'),nullable=True)
+    magazine_id:Mapped[int] = mapped_column(ForeignKey('magazines.issn'),nullable=True)
     returned:Mapped[bool]=mapped_column(nullable=False,default=False)
     return_date:Mapped[DateTime] = mapped_column(DateTime(),default=datetime.utcnow().date() +timedelta(days=15))
     borrow_date:Mapped[DateTime] = mapped_column(DateTime(),default = datetime.utcnow().date())
@@ -403,8 +482,13 @@ class Record(Base):
     def show_all_records(cls, member_id):
         return session.query(cls).filter_by(member_id=member_id).all()
     
+    
     @classmethod
     def show_user_record(cls, member_id):
         return session.query(cls).filter_by(member_id=member_id,returned=False).all()
+    
+    
+    
+    
     
   
