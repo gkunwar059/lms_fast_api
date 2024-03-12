@@ -4,11 +4,15 @@ from sqlalchemy.orm import Session,relationship,sessionmaker,session,Mapped,mapp
 from sqlalchemy.orm.exc import NoResultFound
 from email_validator import validate_email,EmailNotValidError
 import hashlib
+from decouple import config
+
+DATABASE_CONNECTION=config('database_connection')
+
 class Base(DeclarativeBase):
     pass
 
 try:
-    engine=create_engine('postgresql://postgres:123456789@127.0.0.1:5432/postgres',echo=False)
+    engine=create_engine(DATABASE_CONNECTION,echo=False)
     print("Connection Okay") 
     
 except Exception as er:

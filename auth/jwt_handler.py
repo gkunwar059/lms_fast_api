@@ -1,3 +1,5 @@
+
+from fastapi import HTTPException,status
 import jwt
 from datetime import datetime,timedelta
 from decouple import config
@@ -40,9 +42,11 @@ class Auth:
             return decoded_data
         
         except jwt.ExpiredSignatureError:
-            return "Token has expired."
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Signature expired. Please log in again")
+            
+        
         except jwt.InvalidTokenError:
-            return "Invalid token."
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid token. Please log in again")
 
 
     @staticmethod
@@ -69,55 +73,14 @@ class Auth:
 
     def decode_member_token(token):
         try:  
-            decode_data=jwt.decode(token,LIBRARIAN_JWT_SECRET,algorithms=['LIBRARIAN_JWT_ALGORITHM'])
+            decode_data=jwt.decode(token,MEMBER_JWT_SECRET,algorithms=[MEMBER_JWT_ALGORITHM])
             return decode_data
-        except jwt.ExpiredSignatureError:
-            return "Token has expired !"
         
+        except jwt.ExpiredSignatureError:
+            raise HTTPException (status_code=status.HTTP_401_UNAUTHORIZED,detail="Signature expired. Please log in again!")  
+        
+               
         except jwt.InvalidTokenError:
-            return "Token is invalid !"
+            raise HTTPException (status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid token. Please log in again")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# import time
-# import jwt 
-# from datetime import datetime,timedelta
-# from decouple import config
-# from hashlib import hashlib
-# # from models import Librarian
-
-# JWT_SECRET=config("secret")
-
-# JSW_ALGORITHM=config('algorithm')
-
-
-# def set_password(self,password):
-    
-    

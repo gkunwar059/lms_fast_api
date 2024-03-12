@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import Depends, FastAPI,status,HTTPException
 from pydantic import BaseModel
 from models import Member,Book,Magazine,Publisher,Category,Session,session,MemberBook,MemberMagazine,Record,Librarian
@@ -5,9 +6,9 @@ from typing import Annotated
 from auth.jwt_bearer import Librarian_JwtBearer,Member_JwtBearer
 from auth.jwt_handler import Auth
 
+
 app=FastAPI()
 
-# schemas
 class MemberModel(BaseModel):
     name:str
     member_type:str
@@ -40,18 +41,25 @@ class PublisherModel(BaseModel):
 class CategoryModel(BaseModel):
     name:str
     
+class BorrowBookModel(BaseModel):
+    isbn:int
+    email:str
     
-# class MemberBookModel(BaseModel):
-#     isbn:int   |None
-#     member_id:int | None
+class ReturnBookModel(BaseModel):
+    isbn:int
+    email:str
+    
+    
+class BorrowMagazineBookModel(BaseModel):
+    issn:int
+    email:str
 
-#     book_id:int | None
+class ReturnMagazineBookModel(BaseModel):
+    issn:int
+    email:str
     
-# class MemberMagazineModel(BaseModel):
-#     member_id:int
-#     magazine_id:int
-        
     
+
     
 @app.get('/',tags=['Home'])
 async def home():
@@ -74,7 +82,7 @@ async def get_member(email):
 async def show_all_members():
     return Member.get_all_members()
 
-@app.post("/member/",tags=['Member'])
+@app.post("/member/",tags=['Member'],status_code=status.HTTP_201_CREATED)
 async def add_members(item:MemberModel):
     try:
         new_member=Member.add_member(item.name,item.member_type,item.email,item.password,item.address,item.contact_no)
@@ -83,12 +91,7 @@ async def add_members(item:MemberModel):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=str(e))
  
-#  show member records
-# @app.get('/records/me',tags=['Member'])
-# async def show_records(member)
- 
- 
-    
+
 # Book
 @app.get("/books/{isbn}",tags=['Book'],dependencies=[Depends(Member_JwtBearer())])
 async def get_book(isbn):
@@ -100,7 +103,7 @@ async def show_all_books():
     return Book.get_all_books()
 
 
-@app.post('/books/',tags=['Book'],dependencies=[Depends(Librarian_JwtBearer())])
+@app.post('/books/',tags=['Book'],status_code=status.HTTP_201_CREATED,dependencies=[Depends(Librarian_JwtBearer())])
 async def add_book(book:BookModel):
     try:
         new_book=Book.add_book(book.isbn,book.title,book.author,book.price,book.publisher_id,book.category_id)
@@ -111,12 +114,12 @@ async def add_book(book:BookModel):
 
 
 
-@app.post('/borrowbook/{isbn}/members/{email}',tags=['Book'],dependencies=[Depends(Member_JwtBearer())])
-async def borrow_book(isbn:int,email:str): #instance self xa vane chai instance dekhi call garne hai ta 
+@app.post('/borrowbook',status_code=status.HTTP_201_CREATED,tags=['Book'],dependencies=[Depends(Member_JwtBearer())])
+async def borrow_book(book_borrow:BorrowBookModel): #instance self xa vane chai instance dekhi call garne hai ta 
     
     try:
-        book=Book.get_book(isbn=isbn)
-        member=Member.get_member(email=email)
+        book=Book.get_book(isbn=book_borrow.isbn)
+        member=Member.get_member(email=book_borrow.email)
         if book and member:
             new_borrow_book =book.borrow_book(member.id)
         
@@ -132,11 +135,11 @@ async def borrow_book(isbn:int,email:str): #instance self xa vane chai instance 
         raise HTTPException(status_code=500,detail="Internal server error !")
 
 
-@app.post('/returnbook/{isbn}/members/{email}',tags=['Book'],dependencies=[Depends(Member_JwtBearer())])
-async def return_book(isbn:int,email:str):
+@app.post('/returnbook',status_code=status.HTTP_201_CREATED,tags=['Book'],dependencies=[Depends(Member_JwtBearer())])
+async def return_book(bookreturn:ReturnBookModel):
     try:
-        book=Book.get_book(isbn=isbn)
-        member=Member.get_member(email=email)
+        book=Book.get_book(isbn=bookreturn.isbn)
+        member=Member.get_member(email=bookreturn.email)
         
         if book and member:
             new_return_book=book.return_book(member.id)
@@ -161,7 +164,7 @@ async def get_magazine(issn):
 async def show_all_magazines():
     return Magazine.show_all_magazines()
     
-@app.post('/magazine',tags=['Magazine'],dependencies=[Depends(Librarian_JwtBearer())])
+@app.post('/magazine',tags=['Magazine'],status_code=status.HTTP_201_CREATED,dependencies=[Depends(Librarian_JwtBearer())])
 async def add_magazine(magazine:MagazineModel):
     try:
     
@@ -172,11 +175,11 @@ async def add_magazine(magazine:MagazineModel):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=str(e))
  
 # borrow magazine    
-@app.post('/borrowmagazine/{issn}/members/{email}',tags=['Magazine'],dependencies=[Depends(Member_JwtBearer())])
-async def borrow_magazine(issn:int,email:str):
+@app.post('/borrowmagazine',status_code=status.HTTP_201_CREATED,tags=['Magazine'],dependencies=[Depends(Member_JwtBearer())])
+async def borrow_magazine(magazineborrow:BorrowMagazineBookModel):
     try:
-        magazine=Magazine.get_magazine(issn=issn)
-        member=Member.get_member(email=email)
+        magazine=Magazine.get_magazine(issn=magazineborrow.issn)
+        member=Member.get_member(email=magazineborrow.email)
         
         if member and magazine:
             new_borrow_book=magazine.borrow_magazine(member.id)
@@ -192,11 +195,11 @@ async def borrow_magazine(issn:int,email:str):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="something went wrong")
 
 
-@app.post('/returnmagazine/{issn}/members/{email}',tags=['Magazine'],dependencies=[Depends(Member_JwtBearer())])
-async def return_magazine(issn:int,email:str):
+@app.post('/returnmagazine',tags=['Magazine'],status_code=status.HTTP_201_CREATED,dependencies=[Depends(Member_JwtBearer())])
+async def return_magazine(magazinereturn:ReturnMagazineBookModel):
     try:
-        magazine=Magazine.get_magazine(issn=issn)
-        member=Member.get_member(email=email)
+        magazine=Magazine.get_magazine(issn=magazinereturn.issn)
+        member=Member.get_member(email=magazinereturn.email)
         
         if member and magazine:
             new_return_magazine=magazine.return_magazine(member.id)
@@ -224,7 +227,7 @@ async def show_all_publisher():
     return Publisher.show_all_publishers()
 
 
-@app.post("/publisher",tags=['Publisher'],dependencies=[Depends(Librarian_JwtBearer())])
+@app.post("/publisher",status_code=status.HTTP_201_CREATED,tags=['Publisher'],dependencies=[Depends(Librarian_JwtBearer())])
 async def add_publisher(publisher_item:PublisherModel):
     try:
         new_publisher=Publisher.add_publisher(publisher_item.name,publisher_item.contact_no,publisher_item.address)
@@ -244,7 +247,7 @@ async def show_category():
         'result':Category.show_all_categories()
     }
     
-@app.post('/categories/',tags=['Category'],dependencies=[Depends(Librarian_JwtBearer())])
+@app.post('/categories/',status_code=status.HTTP_201_CREATED,tags=['Category'],dependencies=[Depends(Librarian_JwtBearer())])
 async def add_category(category:CategoryModel):
     try:
         new_category=Category.add_category(category.name)
@@ -286,6 +289,19 @@ async def login(email:str,password:str):
         return token
     else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Incorrect email or Password !")
+   
+    
+@app.get('/librarian/refresh',tags=['Librarian'])
+async def refresh_login(refresh_token:str):
+    valid_token=Auth.decode_librarian_token(refresh_token)
+    print(valid_token)
+    
+    if valid_token:
+        return Auth.generate_librarian_token(valid_token["email"])
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Incorrect email and Password !")
+    
+    
     
 @app.post('/member/login',tags=['Member'])
 async def login(email:str,password:str):
@@ -296,19 +312,24 @@ async def login(email:str,password:str):
     
     else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Incorrect email and Password !") 
+  
+  
     
-
+@app.get('/member/refresh',tags=['Member'])
+async def refresh_token(refresh_token:str):
+    valid_token=Auth.decode_member_token(refresh_token)
+    print(valid_token)
     
-    
-    
-    
-    
-@app.get('/refresh',tags=['Librarian'])
-async def refresh_login(refresh_token:str):
-    valid_token=Auth.decode_librarian_token(refresh_token)
     if valid_token:
-        return Auth.generate_librarian_token(valid_token["email"])
+        return Auth.generate_member_token(valid_token["email"])
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Incorrect email and Password !")
+     
 
-    
+
+
+
+
+
+if __name__=='__main__':
+    uvicorn.run("main:app",host="127.0.0.1",port=8000,reload=True)
