@@ -19,12 +19,15 @@ class Auth:
         # Generate both acess and refresh token
         access_payload={
             'email':email,
-            'exp':datetime.utcnow() +timedelta(minutes=15)
+            'exp':datetime.utcnow() +timedelta(minutes=40),
+            'token_type':'access'
         }
         
         refresh_payload={
             'email':email,
-            'exp':datetime.utcnow() +timedelta(minutes=35)
+            'exp':datetime.utcnow() +timedelta(minutes=35),
+            'token_type':'refresh'
+            
         }
         
         access_token=jwt.encode(access_payload,LIBRARIAN_JWT_SECRET,algorithm=LIBRARIAN_JWT_ALGORITHM)
@@ -55,7 +58,7 @@ class Auth:
         
         access_payload={
             'email':email,
-            'exp':datetime.utcnow()+timedelta(minutes=15)
+            'exp':datetime.utcnow()+timedelta(minutes=45)
         }
         
         refresh_payload={
