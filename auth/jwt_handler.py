@@ -66,6 +66,7 @@ class Auth:
             'exp':datetime.utcnow()+timedelta(minutes=35)
         }
 
+
         access_token=jwt.encode(access_payload,MEMBER_JWT_SECRET,algorithm=MEMBER_JWT_ALGORITHM)
         refresh_token=jwt.encode(refresh_payload,MEMBER_JWT_SECRET,algorithm=MEMBER_JWT_ALGORITHM)
         

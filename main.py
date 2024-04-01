@@ -64,18 +64,6 @@ class BookModel(BaseModel):
     publisher_id: int
     category_id: int
 
-    # class config():{
-    #     'json_schema_extra':{
-    #         "examples":[{
-    #             "isbn":"1234567891012",
-    #             "title":"Muna Madan",
-    #             "author":"Laxmi Prasad Devkota",
-    #             "price":"350",
-    #             "Publisher_id":"Publisher ID :1",
-    #             "category_id":"Category ID,ie:2"
-    #         }]
-    #     }
-    # }
 
 
 class MagazineModel(BaseModel):
@@ -86,22 +74,10 @@ class MagazineModel(BaseModel):
     publisher_id: int
     category_id: int
 
-
 class PublisherModel(BaseModel):
     name: str
     contact_no: str
     address: str
-
-    # class config():{
-    #     "json_schema_extra":{
-    #         "examples":[{
-    #             'name':"Kantipur Media Group",
-    #             'contact_no':"123456",
-    #             'address':"darabar maga"
-    #         }]
-    #     }
-    # }
-
 
 class CategoryModel(BaseModel):
     name: str
@@ -127,21 +103,6 @@ class ReturnMagazineBookModel(BaseModel):
     email: str
 
 logger.info("Starting API............")
-
-
-
-
-# @app.middleware("http")
-# async def log_middleware(request:Request,call_next):
-#     log_dict={
-#         'url':request.url.path,
-#         'method':request.method
-#     }
-#     logger.info(log_dict)
-    
-#     response=await call_next(request)
-#     return response
-
 
 
 
@@ -542,6 +503,8 @@ async def refresh_token(refresh_token: str):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ErrorMessages.INVALID_CREDENTIALS,
         )
+
+
 
 
 # if __name__ == "__main__":

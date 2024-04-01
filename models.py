@@ -467,7 +467,7 @@ class Record(Base):
     def show_all_records(cls, member_id):
         return session.query(cls).filter_by(member_id=member_id).all()
     
-
+    
     @classmethod
     def show_user_record(cls, member_id):
         return session.query(cls).filter_by(member_id=member_id,returned=False).all()

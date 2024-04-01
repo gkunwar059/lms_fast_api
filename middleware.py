@@ -15,7 +15,8 @@ async def log_middleware(request:Request,call_next):
         'method':request.method,
         'status_code':response.status_code,
         'process_time':process_time
-        
+       
+       
     }
     logger.info(f"Request recieved at {request.url}",extra=log_dict)
     
