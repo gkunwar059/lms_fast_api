@@ -2,42 +2,41 @@ import uvicorn
 from fastapi import Depends, FastAPI, status, HTTPException, exceptions
 from pydantic import BaseModel, config
 from sqlalchemy.exc import IntegrityError
-from error_message import ErrorMessages
+from utils.constant_message import ConstantMessage
 from models import (
-    Member,
+    User,
     Book,
     Magazine,
     Publisher,
     Category,
     Session,
     session,
-    MemberBook,
-    MemberMagazine,
+    UserBook,
+    UserMagazine,
     Record,
-    Librarian,
 )
 from typing import Annotated
-from auth.jwt_bearer import Librarian_JwtBearer, Member_JwtBearer
+from auth.jwt_bearer import User_JwtBearer
 from auth.jwt_handler import Auth
 from starlette.middleware.base import BaseHTTPMiddleware
-
-from logger import logger
-from middleware import log_middleware
+from auth.permission_check import RoleCheck
+from utils.logger import logger
+from utils.middleware import log_middleware
 
 
 app = FastAPI(
     title="Library Management System ",
 )
-app.add_middleware(BaseHTTPMiddleware,dispatch=log_middleware)
-# app = FastAPI()
+app.add_middleware(BaseHTTPMiddleware, dispatch=log_middleware)
 
-class MemberModel(BaseModel):
+
+class UserModel(BaseModel):
     name: str
-    member_type: str
     email: str
     password: str
     address: str
     contact_no: int
+    role_id: int
 
 
 class LoginModel(BaseModel):
@@ -65,7 +64,6 @@ class BookModel(BaseModel):
     category_id: int
 
 
-
 class MagazineModel(BaseModel):
     issn: int
     title: str
@@ -74,10 +72,12 @@ class MagazineModel(BaseModel):
     publisher_id: int
     category_id: int
 
+
 class PublisherModel(BaseModel):
     name: str
     contact_no: str
     address: str
+
 
 class CategoryModel(BaseModel):
     name: str
@@ -102,49 +102,54 @@ class ReturnMagazineBookModel(BaseModel):
     issn: int
     email: str
 
-logger.info("Starting API............")
 
+class RefreshToken(BaseModel):
+    refresh_token: str
 
 
 @app.get("/", tags=["Home"])
 async def home():
     return {
-        "Members": "/members",
+        "User": "/users",
         "Books": "/books",
         "Publisher": "/publisher",
         "Category": "/category",
     }
 
 
-#   member
-@app.get(
-    "/members/{email}", tags=["Member"], dependencies=[Depends(Member_JwtBearer())]
-)
-async def get_member(email):
+#   user
+@app.get("/users/{email}", tags=["User"], dependencies=[Depends(User_JwtBearer())])
+async def get_user(
+    email, _: bool = Depends(RoleCheck(allowed_permission=["user:all", "admin:all"]))
+):
     logger.info("Request to index page !")
-    return Member.get_member(email)
+    return User.get_user(email)
 
 
-@app.get("/members/", tags=["Member"], dependencies=[Depends(Member_JwtBearer())])
-async def show_all_members(page_num: int = 1, page_size: int = 10):
+@app.get("/users/", tags=["User"], dependencies=[Depends(User_JwtBearer())])
+async def show_all_users(
+    page_num: int = 1,
+    page_size: int = 10,
+    _: bool = Depends(RoleCheck(allowed_permission=["admin:all"])),
+):
     start = (page_num - 1) * page_size
     end = start + page_size
 
-    member = Member.get_all_members()
+    user = User.get_all_users()
     response = {
-        "member": member[start:end],
-        "total": len(member),
+        "user": user[start:end],
+        "total": len(user),
         "count": page_size,
         "pagination": {},
     }
 
-    if end > len(member):
+    if end > len(user):
         response["pagination"]["next"] = None
 
         if page_num > 1:
             response["pagination"][
                 "previous"
-            ] = f"/members?page_num={page_num-1}&page_size={page_size}"
+            ] = f"/users?page_num={page_num-1}&page_size={page_size}"
         else:
             response["pagination"]["previous"] = None
 
@@ -152,43 +157,46 @@ async def show_all_members(page_num: int = 1, page_size: int = 10):
         if page_num > 1:
             response["pagination"][
                 "previous"
-            ] = f"/members?page_num={page_num-1}&page_size={page_size}"
+            ] = f"/users?page_num={page_num-1}&page_size={page_size}"
         else:
             response["pagination"]["previous"] = None
 
         response["pagination"][
             "next"
-        ] = f"/members?page_num={page_num+1}&page_size={page_size}"
+        ] = f"/users?page_num={page_num+1}&page_size={page_size}"
 
     return response
 
 
-@app.post("/member/", tags=["Member"], status_code=status.HTTP_201_CREATED)
-async def add_members(item: MemberModel):
+@app.post("/user/", tags=["User"], status_code=status.HTTP_201_CREATED)
+async def add_user(item: UserModel):
     try:
-        new_member = Member.add_member(
+        new_user = User.add_user(
             item.name,
-            item.member_type,
             item.email,
             item.password,
             item.address,
             item.contact_no,
+            item.role_id,
         )
-        return new_member
+        return new_user
 
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 # Book
-@app.get("/books/{isbn}", tags=["Book"], dependencies=[Depends(Member_JwtBearer())])
-async def get_book(isbn):
+@app.get("/book/{isbn}", tags=["Book"], dependencies=[Depends(User_JwtBearer())])
+async def get_book(
+    isbn, _: bool = Depends(RoleCheck(allowed_permission=["admin:all"]))
+):
     return Book.get_book(isbn=isbn)
 
 
-
-@app.get("/books/", tags=["Book"], dependencies=[Depends(Librarian_JwtBearer())])
-async def show_all_books():
+@app.get("/books/", tags=["Book"], dependencies=[Depends(User_JwtBearer())])
+async def show_all_books(
+    _: bool = Depends(RoleCheck(allowed_permission=["user:all", "admin:all"]))
+):
     return Book.get_all_books()
 
 
@@ -196,9 +204,11 @@ async def show_all_books():
     "/books/",
     tags=["Book"],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(Librarian_JwtBearer())],
+    dependencies=[Depends(User_JwtBearer())],
 )
-async def add_book(book: BookModel):
+async def add_book(
+    book: BookModel, _: bool = Depends(RoleCheck(allowed_permission=["admin:all"]))
+):
     try:
         new_book = Book.add_book(
             book.isbn,
@@ -214,67 +224,80 @@ async def add_book(book: BookModel):
 
 
 @app.post(
-    "/books/borrowbook",
+    "/book/borrow",
     status_code=status.HTTP_201_CREATED,
     tags=["Book"],
-    dependencies=[Depends(Member_JwtBearer())],
+    dependencies=[Depends(User_JwtBearer())],
 )
-async def borrow_book(book_borrow: BorrowBookModel):
+async def borrow_book(
+    book_borrow: BorrowBookModel,
+    _: bool = Depends(RoleCheck(allowed_permission=["user:all", "admin:all"])),
+):
     # instance self xa vane chai instance dekhi call garne hai ta
     book = Book.get_book(isbn=book_borrow.isbn)
-    member = Member.get_member(email=book_borrow.email)
+    user = User.get_user(email=book_borrow.email)
 
-    if book and member:
-        new_book_borrow = book.borrow_book(member.id)
+    if book and user:
+        new_book_borrow = book.borrow_book(user.id)
         # return new_book_borrow
         if new_book_borrow:
             return new_book_borrow
-      
+
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=ErrorMessages.CREDENTIALS_NOT_MATCHED,
+            detail=ConstantMessage.CREDENTIALS_NOT_MATCHED,
         )
 
 
 @app.post(
-    "/books/returnbook",
+    "/book/return",
     status_code=status.HTTP_201_CREATED,
     tags=["Book"],
-    dependencies=[Depends(Member_JwtBearer())],
+    dependencies=[Depends(User_JwtBearer())],
 )
-async def return_book(bookreturn: ReturnBookModel):
+async def return_book(
+    bookreturn: ReturnBookModel,
+    _: bool = Depends(RoleCheck(allowed_permission=["user:all", "admin:all"])),
+):
     book = Book.get_book(isbn=bookreturn.isbn)
-    member = Member.get_member(email=bookreturn.email)
+    user = User.get_user(email=bookreturn.email)
 
-    if book and member:
+    if book and user:
 
-        new_return_book = book.return_book(member.id)
+        new_return_book = book.return_book(user.id)
 
         if new_return_book:
             return new_return_book
         else:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorMessages.BOOK_ALREADY_RETURNED)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ConstantMessage.BOOK_ALREADY_RETURNED,
+            )
 
     else:
-        raise HTTPException(status_code=404, detail=ErrorMessages.BOOK_OR_MEMBER_NOT_FOUND)
+        raise HTTPException(
+            status_code=404, detail=ConstantMessage.BOOK_OR_USER_NOT_FOUND
+        )
 
 
 # for magazine
 @app.get(
-    "/magazines/{issn}",
+    "/magazine/{issn}",
     tags=["Magazine"],
-    dependencies=[Depends(Librarian_JwtBearer())],
+    dependencies=[Depends(User_JwtBearer())],
 )
-async def get_magazine(issn):
+async def get_magazine(
+    issn, _: bool = Depends(RoleCheck(allowed_permission=["admin:all"]))
+):
     # TODO: needs to rasie exception if not found
     return Magazine.get_magazine(issn=issn)
 
 
-@app.get(
-    "/magazines/", tags=["Magazine"], dependencies=[Depends(Librarian_JwtBearer())]
-)
-async def show_all_magazines():
+@app.get("/magazines/", tags=["Magazine"], dependencies=[Depends(User_JwtBearer())])
+async def show_all_magazines(
+    _: bool = Depends(RoleCheck(allowed_permission=["user:all", "admin:all"]))
+):
     return Magazine.show_all_magazines()
 
 
@@ -282,9 +305,12 @@ async def show_all_magazines():
     "/magazine",
     tags=["Magazine"],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(Librarian_JwtBearer())],
+    dependencies=[Depends(User_JwtBearer())],
 )
-async def add_magazine(magazine: MagazineModel):
+async def add_magazine(
+    magazine: MagazineModel,
+    _: bool = Depends(RoleCheck(allowed_permission=["admin:all"])),
+):
     try:
 
         new_magazine = Magazine.add_magazine(
@@ -297,54 +323,61 @@ async def add_magazine(magazine: MagazineModel):
         )
         return new_magazine
     except IntegrityError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=ErrorMessages.DUPLICATE_ISBN)
-    
-    
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ConstantMessage.DUPLICATE_ISBN,
+        )
+
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 # borrow magazine
 @app.post(
-    "/magazines/borrowmagazine",
+    "/magazine/borrow",
     status_code=status.HTTP_201_CREATED,
     tags=["Magazine"],
-    dependencies=[Depends(Member_JwtBearer())],
+    dependencies=[Depends(User_JwtBearer())],
 )
-async def borrow_magazine(magazineborrow: BorrowMagazineBookModel):
-    # try:
+async def borrow_magazine(
+    magazineborrow: BorrowMagazineBookModel,
+    _: bool = Depends(RoleCheck(allowed_permission=["admin:all", "user:all"])),
+):
     magazine = Magazine.get_magazine(issn=magazineborrow.issn)
-    member = Member.get_member(email=magazineborrow.email)
+    user = User.get_user(email=magazineborrow.email)
 
-    if member and magazine:
-        new_borrow_magazine = magazine.borrow_magazine(member.id)
+    if user and magazine:
+        new_borrow_magazine = magazine.borrow_magazine(user.id)
         if new_borrow_magazine:
             return new_borrow_magazine
 
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorMessages.FAILED_TO_BORROW_MAGAZINE
+                detail=ConstantMessage.FAILED_TO_BORROW_MAGAZINE,
             )
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ErrorMessages.MAGAZINE_AND_MEMBER_NOT_FOUND,
+            detail=ConstantMessage.MAGAZINE_AND_USER_NOT_FOUND,
         )
-   
+
 
 @app.post(
-    "/magazines/returnmagazine",
+    "/magazine/return",
     tags=["Magazine"],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(Member_JwtBearer())],
+    dependencies=[Depends(User_JwtBearer())],
 )
-async def return_magazine(magazinereturn: ReturnMagazineBookModel):
+async def return_magazine(
+    magazinereturn: ReturnMagazineBookModel,
+    _: bool = Depends(RoleCheck(allowed_permission=["admin:all", "user:all"])),
+):
     magazine = Magazine.get_magazine(issn=magazinereturn.issn)
-    member = Member.get_member(email=magazinereturn.email)
+    user = User.get_user(email=magazinereturn.email)
 
-    if member and magazine:
-        new_return_magazine = magazine.return_magazine(member.id)
+    if user and magazine:
+        new_return_magazine = magazine.return_magazine(user.id)
 
         if new_return_magazine:
             return new_return_magazine
@@ -352,23 +385,26 @@ async def return_magazine(magazinereturn: ReturnMagazineBookModel):
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorMessages.MAGAZINE_ALREADY_RETURNED,
+                detail=ConstantMessage.MAGAZINE_ALREADY_RETURNED,
             )
 
     else:
-        raise HTTPException(status_code=400, detail=ErrorMessages.MAGAZINE_NOT_FOUND)
-
-
-
-@app.get("/publishers/{name}", tags=["Publisher"], dependencies=[Depends(Librarian_JwtBearer())])
-async def get_publisher(name):
-    return Publisher.get_publisher(name=name)
+        raise HTTPException(status_code=400, detail=ConstantMessage.MAGAZINE_NOT_FOUND)
 
 
 @app.get(
-    "/publishers", tags=["Publisher"], dependencies=[Depends(Librarian_JwtBearer())]
+    "/publisher/{name}", tags=["Publisher"], dependencies=[Depends(User_JwtBearer())]
 )
-async def show_all_publisher():
+async def get_publisher(
+    name, _: bool = Depends(RoleCheck(allowed_permission=["admin:all"]))
+):
+    return Publisher.get_publisher(name=name)
+
+
+@app.get("/publishers", tags=["Publisher"], dependencies=[Depends(User_JwtBearer())])
+async def show_all_publisher(
+    _: bool = Depends(RoleCheck(allowed_permission=["user:all", "admin:all"]))
+):
     return Publisher.show_all_publishers()
 
 
@@ -376,9 +412,12 @@ async def show_all_publisher():
     "/publisher",
     status_code=status.HTTP_201_CREATED,
     tags=["Publisher"],
-    dependencies=[Depends(Librarian_JwtBearer())],
+    dependencies=[Depends(User_JwtBearer())],
 )
-async def add_publisher(publisher_item: PublisherModel):
+async def add_publisher(
+    publisher_item: PublisherModel,
+    _: bool = Depends(RoleCheck(allowed_permission=["admin:all"])),
+):
     try:
         new_publisher = Publisher.add_publisher(
             publisher_item.name, publisher_item.contact_no, publisher_item.address
@@ -390,24 +429,31 @@ async def add_publisher(publisher_item: PublisherModel):
 
 # category
 @app.get("/category/{name}", tags=["Category"])
-async def get_category(name):
+async def get_category(
+    name, _: bool = Depends(RoleCheck(allowed_permission=["admin:all", "user:all"]))
+):
     category = Category.get_category(name=name)
     return category.name
 
 
-@app.get(
-    "/categories", tags=["Category"], dependencies=[Depends(Librarian_JwtBearer())]
-)
-async def show_category():
+@app.get("/categories", tags=["Category"], dependencies=[Depends(User_JwtBearer)])
+async def show_category(
+    _: bool = Depends(RoleCheck(allowed_permission=["user:all", "admin:all"]))
+):
+
     return {"result": Category.show_all_categories()}
 
+
 @app.post(
-    "/categories/",
+    "/category/",
     status_code=status.HTTP_201_CREATED,
     tags=["Category"],
-    dependencies=[Depends(Librarian_JwtBearer())],
+    dependencies=[Depends(User_JwtBearer())],
 )
-async def add_category(category: CategoryModel):
+async def add_category(
+    category: CategoryModel,
+    _: bool = Depends(RoleCheck(allowed_permission=["admin:all"])),
+):
     try:
         new_category = Category.add_category(category.name)
         return new_category
@@ -417,95 +463,53 @@ async def add_category(category: CategoryModel):
 
 
 @app.post("/records/{email}", tags=["Record"])
-async def show_all_records(email: str):
-    member = Member.get_member(email=email)
-    all_my_record = Record.show_all_records(member.id)
+async def show_all_records(
+    email: str,
+    _: bool = Depends(RoleCheck(allowed_permission=["user:all", "admin:all"])),
+):
+    user = User.get_user(email=email)
+    all_my_record = Record.show_all_records(user.id)
     if all_my_record:
         return all_my_record
 
 
 @app.post("/records/me/{email}", tags=["Record"])
-async def show_my_records(email: str):
-    member = Member.get_member(email=email)
-    show_my_record = Record.show_user_record(member.id)
+async def show_my_records(
+    email: str,
+    _: bool = Depends(RoleCheck(allowed_permission=["user:all", "admin:all"])),
+):
+    user = User.get_user(email=email)
+    show_my_record = Record.show_user_record(user.id)
 
     if show_my_record:
         return show_my_record
 
 
-# librarian
-@app.get("/librarian", tags=["Librarian"])
-async def get_librarian(email: str):
-    new_librarian = (
-        session.query(Librarian).where(Librarian.email == email).one_or_none()
-    )
-    return new_librarian
-
-
-@app.post("/librarian/login", tags=["Librarian"])
-async def login(login: LoginModel):
-    librarian = (
-        session.query(Librarian)
-        .filter_by(email=login.email, password=login.password)
+@app.post("/user/login", tags=["User"])
+async def login(user_login: LoginModel):
+    user = (
+        session.query(User)
+        .filter_by(email=user_login.email, password=user_login.password)
         .first()
     )
-    if librarian:
-        token = Auth.generate_librarian_token(email=login.email)
-        return token
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=ErrorMessages.INVALID_CREDENTIALS,
-        )
-
-
-@app.get("/librarian/refresh", tags=["Librarian"])
-async def refresh_login(refresh_token: str):
-    valid_token = Auth.decode_librarian_token(refresh_token)
-    print(valid_token)
-
-    if valid_token:
-        return Auth.generate_librarian_token(valid_token["email"])
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ErrorMessages.INVALID_TOKEN
-        )
-
-
-@app.post("/member/login", tags=["Member"])
-async def login(memb_login: LoginModel):
-    member = (
-        session.query(Member)
-        .filter_by(email=memb_login.email, password=memb_login.password)
-        .first()
-    )
-    if member:
-        token = Auth.generate_member_token(email=memb_login.email)
+    if user:
+        token = Auth.generate_user_token(email=user_login.email)
         return token
 
     else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=ErrorMessages.INVALID_CREDENTIALS,
+            detail=ConstantMessage.INVALID_CREDENTIALS,
         )
 
 
-@app.get("/member/refresh", tags=["Member"])
-async def refresh_token(refresh_token: str):
-    valid_token = Auth.decode_member_token(refresh_token)
-    print(valid_token)
-
+@app.post("/user/refresh", tags=["User"])
+async def refresh_token(refresh: RefreshToken):
+    valid_token = Auth.decode_refresh_token(refresh.refresh_token)
     if valid_token:
-        return Auth.generate_member_token(valid_token["email"])
+        return Auth.generate_user_token(valid_token["email"])
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ErrorMessages.INVALID_CREDENTIALS,
+            detail=ConstantMessage.INVALID_CREDENTIALS,
         )
-
-
-
-
-# if __name__ == "__main__":
-#     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
