@@ -1,6 +1,7 @@
 import uvicorn
 from fastapi import Depends, FastAPI, status, HTTPException, exceptions
 from pydantic import BaseModel, config
+from typing import List
 from sqlalchemy.exc import IntegrityError
 from utils.constant_message import ConstantMessage
 from models import (
@@ -14,6 +15,8 @@ from models import (
     UserBook,
     UserMagazine,
     Record,
+    Role,
+    Permission
 )
 from typing import Annotated
 from auth.jwt_bearer import User_JwtBearer
@@ -28,7 +31,6 @@ app = FastAPI(
     title="Library Management System ",
 )
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_middleware)
-
 
 class UserModel(BaseModel):
     name: str
@@ -105,6 +107,21 @@ class ReturnMagazineBookModel(BaseModel):
 
 class RefreshToken(BaseModel):
     refresh_token: str
+    
+class RoleModel(BaseModel):
+    name:str
+    
+class PermissionModel(BaseModel):
+    name:str
+    permission_names:str
+    
+class AssignPermissionRole(BaseModel):
+    permission_id:int
+    role_id:int
+    
+class AssignUserRole(BaseModel):
+    user_id:int
+    role_id:int
 
 
 @app.get("/", tags=["Home"])
@@ -130,7 +147,7 @@ async def get_user(
 async def show_all_users(
     page_num: int = 1,
     page_size: int = 10,
-    _: bool = Depends(RoleCheck(allowed_permission=["admin:all"])),
+    _: bool = Depends(RoleCheck(allowed_permission=["user:all"])),
 ):
     start = (page_num - 1) * page_size
     end = start + page_size
@@ -143,6 +160,7 @@ async def show_all_users(
         "pagination": {},
     }
 
+
     if end > len(user):
         response["pagination"]["next"] = None
 
@@ -152,6 +170,7 @@ async def show_all_users(
             ] = f"/users?page_num={page_num-1}&page_size={page_size}"
         else:
             response["pagination"]["previous"] = None
+
 
     else:
         if page_num > 1:
@@ -166,6 +185,7 @@ async def show_all_users(
         ] = f"/users?page_num={page_num+1}&page_size={page_size}"
 
     return response
+
 
 
 @app.post("/user/", tags=["User"], status_code=status.HTTP_201_CREATED)
@@ -183,6 +203,59 @@ async def add_user(item: UserModel):
 
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@app.post("/role/add",tags=['Role'])
+async def create_role(role:RoleModel):
+    role=Role.create_role(role.name)      #TODO:validation and exception are required later on 
+    if role:
+        return True
+    else:
+        return False
+        
+@app.post('/role/assignrole',tags=['Role'])
+async def assign_role_to_user(assignrole:AssignUserRole):
+    user_role=Role.assign_role_to_user(user_id=assignrole.user_id,role_id=assignrole.role_id)
+    return user_role        
+
+@app.post('/permission',tags=['Permission'])
+async def create_permission(permission:PermissionModel):
+    
+    new_permission=Permission.create_permission(permission.name)
+    return new_permission
+    
+    
+@app.post('/permission/assignrole',tags=['Permission'])
+async def assign_permission_to_role(assign_permission:AssignPermissionRole):
+    role_permission=Permission.assign_permission_to_role(permission_id=assign_permission.permission_id,role_id=assign_permission.role_id)
+    return role_permission
+
+
+
+# @app.post("/roles/")
+# async def create_role_with_permissions(role:PermissionModel):
+#     try:
+#         role = Permission.assign_role_and_permission(role.name, role.permission_names)
+#         # return  role
+#         print(role)
+    
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 # Book
@@ -248,6 +321,7 @@ async def borrow_book(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ConstantMessage.CREDENTIALS_NOT_MATCHED,
         )
+
 
 
 @app.post(
@@ -330,6 +404,15 @@ async def add_magazine(
 
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+
+
+
+
+
+
+
 
 
 # borrow magazine

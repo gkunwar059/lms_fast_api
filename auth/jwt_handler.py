@@ -16,7 +16,7 @@ class Auth:
 
         access_payload = {
             "email": email,
-            "exp": datetime.utcnow() + timedelta(minutes=15),
+            "exp": datetime.utcnow() + timedelta(minutes=85),
         }
 
         refresh_payload = {
@@ -40,8 +40,7 @@ class Auth:
             )
             return decode_data
             
-        
-
+    
         except jwt.ExpiredSignatureError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

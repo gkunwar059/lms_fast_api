@@ -12,7 +12,6 @@ from sqlalchemy import (
 )
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
-from typing import Any, List
 from sqlalchemy.orm import (
     relationship,
     Mapped,
@@ -169,15 +168,9 @@ class User(Base):
         total_permission = []
         user_roles = session.query(UserRole).filter_by(user_id=new_user.id).all()
         for user_role in user_roles:
-            role_permissions = (
-                session.query(RolePermission).filter_by(role_id=user_role.role_id).all()
-            )
+            role_permissions = session.query(RolePermission).filter_by(role_id=user_role.role_id).all()
             for role_permission in role_permissions:
-                permission = (
-                    session.query(Permission)
-                    .filter_by(id=role_permission.permission_id)
-                    .first()
-                )
+                permission = session.query(Permission).filter_by(id=role_permission.permission_id).first()
                 if permission:
                     total_permission.append(permission.name)
 
@@ -186,7 +179,7 @@ class User(Base):
             "role": total_permission,
         }
 
-# TODO: lets make it one to many relationship in the role based authenticaton system (user and role (one to many))
+
 
 
 class Role(Base):
@@ -198,31 +191,13 @@ class Role(Base):
     permissions = relationship(
         "Permission", secondary="role_permission", back_populates="roles"
     )
-    
-    def __init__(self, name: str):
-        self.name = name
-        
 
     @staticmethod
     def create_role(name):
         role = Role(name=name)
-        session.add(role)  # TODO:validation and exception are required later on
+        session.add(role)       #TODO:validation and exception are required later on 
         session.commit()
         return {"Role added sucessfully !"}
-    
-    
-    # @staticmethod
-    # def assign_role_to_user(role_id, user_id):
-    #     user = session.query(User).get(user_id)
-    #     role = session.query(Role).get(role_id)
-    #     # role=session.query(Role).filter_by(id=role_id).first()  s #this approach and above get approach is similar working mechanism where the get is more consise and eazy to acess the
-
-    #     if user and role:
-    #         user.roles.append(role)
-    #         session.commit()
-    #         return True
-    #     else:
-    #         return False
 
     @staticmethod
     def assign_role_to_user(role_id, user_id):
@@ -236,21 +211,21 @@ class Role(Base):
             return True
         else:
             return False
-
+        
+    @staticmethod
+    def get_permission(role_id):
+        return session.scalars(
+            Select(Role.name).where(Role.id == role_id)
+        ).first()
 
 class Permission(Base):
     __tablename__ = "permissions"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    
 
     roles = relationship(
         "Role", secondary="role_permission", back_populates="permissions"
     )
-    
-    def __init__(self,name):
-        self.name=name
-
 
     @staticmethod
     def create_permission(name):
@@ -258,27 +233,6 @@ class Permission(Base):
         session.add(permission)
         session.commit()
         return permission
-
-
-    # @staticmethod
-    # def assign_role_and_permission(name,pname):
-    #     role = Role(name=name)
-    #     session.add(role)
-    #     session.commit()
-        
-    #     permission=Permission(name=pname)
-    #     session.add(permission)
-        
-
-    #     if role and permission:
-    #         role.permissions.append(permission)  # NOTE:role ma vayeko permission ma chai permission add garnu ho (yo permissions ma chai relationship le gard chai hunxa )-important concept nai ho , easy but needed many places
-    #         session.commit()
-    #         return True
-    #     else:
-    #         return False
-
-
-
 
     @staticmethod
     def assign_permission_to_role(permission_id, role_id):
@@ -293,6 +247,7 @@ class Permission(Base):
             return True
         else:
             return False
+
 
 
 
@@ -638,11 +593,11 @@ class Category(Base):
 #     permission = mapped_column(ARRAY(String), nullable=False)
 #     user = relationship("User", back_populates="roles")
 
-# @staticmethod
-# def get_permission(role_id):
-#     return session.scalars(
-#         Select(Role.permission).where(Role.id == role_id)
-#     ).first()
+    # @staticmethod
+    # def get_permission(role_id):
+    #     return session.scalars(
+    #         Select(Role.permission).where(Role.id == role_id)
+    #     ).first()
 
 
 class Record(Base):

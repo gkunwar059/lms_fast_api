@@ -32,5 +32,4 @@ with Session(engine) as session:
 #     Role,
 # )
 
-
 # Base.metadata.create_all(engine)

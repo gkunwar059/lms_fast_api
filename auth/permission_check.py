@@ -10,11 +10,12 @@ class RoleCheck:
         self.allowed_permission = allowed_permission
 
     def __call__(self, user=Depends(User.get_current_user)):
+        print(User.get_current_user,"PRint garne yeha current user ")
         """when we call RoleCheck class ,this call method(function) is called first"""
 
-        for users_role in self.allowed_permission:
-            if users_role not in (
-                Role.get_permission(user["role"])
+        for users_permission in self.allowed_permission:
+            if users_permission not in (user['role']
+                # Role.get_permission(user["role"])
             ):  # deyako role ma chai mathi haleko permission xaina vane chai exception gar ,yedi deyako role ma chai permission xa vane chai user return gardinu hai ta
 
                 raise HTTPException(
